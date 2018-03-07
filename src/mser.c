@@ -159,7 +159,7 @@ void test_memory(void){
   #ifdef DEBUG_MSER
     printf(" done");
     printf("\n\r\t Testing neighbor level: ");
-    printf("\n\r\t [ONLY WORK FOR 640x480 IMAGES]: ");
+    // printf("\n\r\t [ONLY WORK FOR 640x480 IMAGES]: ");
   #endif
   //
   //                      edge 3=1
@@ -167,7 +167,7 @@ void test_memory(void){
   //                    edge 1=1281
   //
   for (size_t i = 0; i < 4; i++) {
-    uint8_t nl = getPixelneighborLevel(641, i);
+    uint8_t nl = getPixelneighborLevel(IMG_RESOLUTION_WIDTH+1, i);
     assert(neighbor_level_default[i] == nl);
     #ifdef DEBUG_MSER
       printf("\n\r\t ->Edge %d expected: %x level: %x = OK",i,neighbor_level_default[i], nl);
@@ -295,12 +295,13 @@ void mser_find(void){
   //for (size_t i = 0; i < 4; i++) {
   //  printf("\n\rEDGE=%d PIXEL_VALUE=%d",i,getPixelneighborLevel(641, i));
   //}
-  // while (!done) {
-  //   gCounterIter++;
-  //
-  //   while (gCurrentEdge < 4) {
-  //     edge_current++;
-  //   }
-  //   done = 1;
-  // }
+  while (!done) {
+    gCounterIter++;
+    //+- 2000 instrucoes / ms
+
+    // while (gCurrentEdge < 4) {
+    //   edge_current++;
+    // }
+    done = gCounterIter > IMG_TOTAL_PIXELS ? 1 : 0;
+  }
 }

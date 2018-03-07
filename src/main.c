@@ -40,7 +40,7 @@ int main(void) {
   while (1) {
     mser_find();
     printf("\n\rRUNNING...");
-    delay_us(ALT_MICROSECS_IN_A_SEC/10);
+    //delay_us(ALT_MICROSECS_IN_A_SEC/10);
 	}
 	return 0;
 }
