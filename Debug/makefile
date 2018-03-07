@@ -29,10 +29,10 @@ endif
 all: CRIOS_ARM.axf
 
 # Tool invocations
-CRIOS_ARM.axf: $(OBJS) C:\Users\aignacio\Desktop\CRIOS_HELLO_WORLD_BACKUP\CRIOS_ARM\cycloneV-dk-ram-modified.ld $(USER_OBJS)
+CRIOS_ARM.axf: $(OBJS) C:\Users\aignacio\Documents\DS-5\ Workspace\CRIOS_ARM\cycloneV-dk-ram-hosted.ld $(USER_OBJS)
 	@echo 'Building target: $@'
 	@echo 'Invoking: GCC C Linker 6.2.0 [arm-altera-eabi]'
-	arm-altera-eabi-gcc.exe -T "C:\Users\aignacio\Desktop\CRIOS_HELLO_WORLD_BACKUP\CRIOS_ARM\cycloneV-dk-ram-modified.ld" -o "CRIOS_ARM.axf" $(OBJS) $(LIBS) $(USER_OBJS)
+	arm-altera-eabi-gcc.exe -T "C:\Users\aignacio\Documents\DS-5 Workspace\CRIOS_ARM\cycloneV-dk-ram-hosted.ld" -o "CRIOS_ARM.axf" $(OBJS) $(LIBS) $(USER_OBJS)
 	@echo 'Finished building target: $@'
 	@echo ' '
 	$(MAKE) --no-print-directory post-build

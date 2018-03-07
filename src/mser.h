@@ -1,12 +1,12 @@
 #ifndef _MSER_H_
 #define _MSER_H_
 
-#define DEBUG_MSER            1
+#define DEBUG_MSER
 #define IMG_RESOLUTION_WIDTH  640
 #define IMG_RESOLUTION_HEIGHT 480
 #define IMG_TOTAL_PIXELS      (IMG_RESOLUTION_WIDTH*IMG_RESOLUTION_HEIGHT)
 #define IMG_OFFSET_ADDR       0xC00000
-#define MASK_OFFSET_ADDR      0xD00000
+#define MASK_OFFSET_ADDR      0xE00000
 
 // MSER Parameters
 #define MSER_MIN_AREA         0.00001*IMG_TOTAL_PIXELS
@@ -44,7 +44,7 @@ typedef struct regions {
 } regions_t;
 
 // Main Structure of boundary pixels that'll store the
-// neighboors grey levels 0-256;
+// neighbors grey levels 0-256;
 struct bp_stack {
   int top; // We need to assume -1, that's why used int type
   uint16_t capacity;
