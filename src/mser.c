@@ -12,10 +12,78 @@
 
 struct bp_stack* gBoundary[BD_MAX_LEVELS];
 regions_t* gRegions[MSER_MAX_REG];
-uint32_t gCurrentPixel = 0;
+uint16_t stackRegions[MSER_MAX_REG];
 uint16_t gIndexRegions = 0;
+uint16_t gIndexStack = 0;
 uint32_t gCounterIter = 0;
-uint8_t gCurrentEdge = 0;
+
+/******************** START REGION FUNCTIONS ********************/
+void processStack(uint8_t newPixelGreyLevel){
+  uint16_t indexTop,
+           indexNewTop;
+  uint8_t newTopLevel;
+
+  while (newPixelGreyLevel > gRegions[stackRegions[gIndexStack]]->level) {
+    indexTop = stackRegions[gIndexStack];
+    gIndexStack--;
+    indexNewTop = stackRegions[gIndexStack];
+    newTopLevel = gRegions[indexNewTop]->level;
+    if (newPixelGreyLevel < newTopLevel) {
+      gIndexRegions++;
+      gIndexStack++;
+      gRegions[gIndexRegions]->level = newPixelGreyLevel;
+      gRegions[gIndexRegions]->area = gRegions[indexTop]->area;
+      for (size_t i = 0; i < 5; i++) {
+        gRegions[gIndexRegions]->mom[i] = gRegions[indexTop]->mom[i];
+      }
+      gRegions[gIndexRegions]->stable = 0;
+      gRegions[gIndexRegions]->parent = NULL;
+      gRegions[indexTop]->next = gRegions[gIndexRegions]->child;
+      gRegions[indexTop]->parent = gRegions[gIndexRegions];
+      gRegions[gIndexRegions]->child = gRegions[indexTop];
+      gRegions[gIndexRegions]->next = NULL;
+
+      gRegions[gIndexRegions]->rect.top = (gRegions[indexTop]->rect.top < gRegions[gIndexRegions]->rect.top ? gRegions[indexTop]->rect.top : gRegions[gIndexRegions]->rect.top);
+      gRegions[gIndexRegions]->rect.bottom = (gRegions[indexTop]->rect.bottom > gRegions[gIndexRegions]->rect.bottom ? gRegions[indexTop]->rect.bottom : gRegions[gIndexRegions]->rect.bottom);
+      gRegions[gIndexRegions]->rect.left = (gRegions[indexTop]->rect.left < gRegions[gIndexRegions]->rect.left ? gRegions[indexTop]->rect.left : gRegions[gIndexRegions]->rect.left);
+      gRegions[gIndexRegions]->rect.right = (gRegions[indexTop]->rect.right > gRegions[gIndexRegions]->rect.right ? gRegions[indexTop]->rect.right : gRegions[gIndexRegions]->rect.right);
+
+      stackRegions[gIndexStack] = gIndexRegions;
+      break;
+    }
+
+    gRegions[indexNewTop]->area += gRegions[indexTop]->area;
+    for (size_t i = 0; i < 5; i++) {
+      gRegions[indexNewTop]->mom[i] += gRegions[indexTop]->mom[i];
+    }
+    gRegions[indexTop]->parent = gRegions[indexNewTop];
+    gRegions[indexTop]->next = gRegions[indexNewTop]->child;
+    gRegions[indexNewTop]->child = gRegions[indexTop];
+
+    gRegions[indexNewTop]->rect.top = (gRegions[indexTop]->rect.top < gRegions[indexNewTop]->rect.top ? gRegions[indexTop]->rect.top : gRegions[indexNewTop]->rect.top);
+    gRegions[indexNewTop]->rect.bottom = (gRegions[indexTop]->rect.bottom > gRegions[indexNewTop]->rect.bottom ? gRegions[indexTop]->rect.bottom : gRegions[indexNewTop]->rect.bottom);
+    gRegions[indexNewTop]->rect.left = (gRegions[indexTop]->rect.left < gRegions[indexNewTop]->rect.left ? gRegions[indexTop]->rect.left : gRegions[indexNewTop]->rect.left);
+    gRegions[indexNewTop]->rect.right = (gRegions[indexTop]->rect.right > gRegions[indexNewTop]->rect.right ? gRegions[indexTop]->rect.right : gRegions[indexNewTop]->rect.right);
+
+    stackRegions[gIndexStack] = indexNewTop;
+  }
+}
+
+void accumulateRegion(uint16_t x, uint16_t y){
+    uint16_t topRegion = stackRegions[gIndexStack];
+    gRegions[topRegion]->area += 1;
+    gRegions[topRegion]->mom[0] += x;
+    gRegions[topRegion]->mom[1] += y;
+    gRegions[topRegion]->mom[2] += (x*x);
+    gRegions[topRegion]->mom[3] += (x*y);
+    gRegions[topRegion]->mom[4] += (y*y);
+    gRegions[topRegion]->rect.top = (gRegions[topRegion]->rect.top < y ? gRegions[topRegion]->rect.top : y);
+    gRegions[topRegion]->rect.bottom = (gRegions[topRegion]->rect.bottom > (y+1) ? gRegions[topRegion]->rect.bottom : y+1);
+    gRegions[topRegion]->rect.left = (gRegions[topRegion]->rect.left < x ? gRegions[topRegion]->rect.left : x);
+    gRegions[topRegion]->rect.right = (gRegions[topRegion]->rect.right > (x+1) ? gRegions[topRegion]->rect.right : x+1);
+}
+
+/******************** END REGION FUNCTIONS ********************/
 
 /******************** START STACK METHODS ********************/
 struct bp_stack* CreateStack(uint16_t size){
@@ -67,6 +135,16 @@ void printStack(struct bp_stack* stack) {
 /******************** END STACK METHODS ********************/
 
 /******************** MEMORY FUNCTIONS ********************/
+void setPixelLevel(uint16_t x, uint16_t y, uint8_t value){
+  uint32_t pixel_linear = x*y;
+  uint32_t *ptr_level = TEST_OFFSET_ADDR;
+  uint32_t addrOffset = pixel_linear/4;
+  ptr_level += addrOffset;
+  uint8_t remain = pixel_linear%4;
+  uint32_t mask = ((0xff & value) << remain*8);
+  *(ptr_level) |= mask;
+}
+
 uint8_t getPixelLevel(uint32_t pixel){
   uint32_t *ptr_level = IMG_OFFSET_ADDR;
   uint32_t addrOffset = pixel/4;
@@ -83,7 +161,7 @@ uint8_t getPixelneighborLevel(uint32_t pixel, uint8_t edge){
   uint32_t neighborPixel;
   uint16_t x = pixel%IMG_RESOLUTION_WIDTH;
   uint16_t y = pixel/IMG_RESOLUTION_WIDTH;
-  uint8_t neighborLevel;
+  uint8_t nLevel;
   //
   //                   edge=3
   //           edge=2  PIXEL  edge=0
@@ -115,8 +193,46 @@ uint8_t getPixelneighborLevel(uint32_t pixel, uint8_t edge){
     break;
   }
 
-  neighborLevel = getPixelLevel(neighborPixel);
-  return neighborLevel;
+  nLevel = getPixelLevel(neighborPixel);
+  return nLevel;
+}
+
+uint32_t getPixelneighbor(uint32_t pixel, uint8_t edge){
+  uint32_t neighborPixel;
+  uint16_t x = pixel%IMG_RESOLUTION_WIDTH;
+  uint16_t y = pixel/IMG_RESOLUTION_WIDTH;
+  //
+  //                   edge=3
+  //           edge=2  PIXEL  edge=0
+  //                   edge=1
+  //
+  switch (edge) {
+    case 0: // >>
+      if (x < (IMG_RESOLUTION_WIDTH-1)) {
+        neighborPixel = pixel+1;
+      }
+    break;
+    case 1: // VV
+      if (y < (IMG_RESOLUTION_HEIGHT-1)) {
+        neighborPixel = pixel+IMG_RESOLUTION_WIDTH;
+      }
+    break;
+    case 2: // <<
+      if (x > 0) {
+        neighborPixel = pixel-1;
+      }
+    break;
+    case 3: // ^^
+      if (y > 0) {
+        neighborPixel = pixel-IMG_RESOLUTION_WIDTH;
+      }
+    break;
+    default:
+      neighborPixel = pixel;
+    break;
+  }
+
+  return neighborPixel;
 }
 
 void setMaskBinPixel(uint32_t pixel){
@@ -142,7 +258,7 @@ bool getMaskBinPixel(uint32_t pixel){
 
 // This function implements a simple test to write and read each pixel variables
 // such as LEVEL and BINARY mask in the SDRAM memory before start the algorithm
-void test_memory(void){
+void testMem(void){
   uint8_t level_default[] = {0x41,0x4e,0x44,0x45}; // 'ANDE'
   uint8_t neighbor_level_default[] = {0x44,0x4e,0x41,0x4e};
   #ifdef DEBUG_MSER
@@ -180,7 +296,7 @@ void test_memory(void){
 }
 /******************** END MEMORY FUNCTIONS ********************/
 
-void init_mem_mask(int offset_addr, int content){
+void initMemMask(int offset_addr, int content){
   int *ptr_memory = offset_addr;
   uint32_t i;
   for (i = 0; i < IMG_TOTAL_PIXELS/32; i++) {
@@ -192,7 +308,7 @@ void init_mem_mask(int offset_addr, int content){
   #endif
 }
 
-void init_mem(int offset_addr, int content){
+void initMemImage(int offset_addr, int content){
   int *ptr_memory = offset_addr;
   uint32_t i;
   for (i = 0; i < IMG_TOTAL_PIXELS/4; i++) {
@@ -204,7 +320,7 @@ void init_mem(int offset_addr, int content){
   #endif
 }
 
-void reset_mser(void){
+void resetMser(void){
   for (size_t i = 0; i < BD_MAX_LEVELS; i++)
     while (!isEmpty(gBoundary[i])) pop(gBoundary[i]);
 
@@ -224,9 +340,16 @@ void reset_mser(void){
     gRegions[i]->rect.right = 0;
     gRegions[i]->rect.draw = false;
   }
+
+  int *ptr_memory = MASK_OFFSET_ADDR;
+  uint32_t i;
+  for (i = 0; i < IMG_TOTAL_PIXELS/32; i++) {
+    *(ptr_memory) = 0x00000000;
+    ptr_memory++;
+  }
 }
 
-void mser_init(void){
+void mserInit(void){
   #ifdef DEBUG_MSER
     printf("\n\n\r MSER configuration started:");
     printf("\n\r\t Image resolution: %d x %d",IMG_RESOLUTION_WIDTH,IMG_RESOLUTION_HEIGHT);
@@ -241,12 +364,12 @@ void mser_init(void){
     printf("\n\r Memory:");
     printf("\n\r\t Writing \'ANDE\' to the memory image address: %x",IMG_OFFSET_ADDR);
   #endif
-  init_mem(IMG_OFFSET_ADDR, 0x45444e41);
+  initMemImage(IMG_OFFSET_ADDR, 0x45444e41);
   #ifdef DEBUG_MSER
     printf(" done");
     printf("\n\r\t Writing 0x00 for the binary mask at the address: %x",MASK_OFFSET_ADDR);
   #endif
-  init_mem_mask(MASK_OFFSET_ADDR, 0x0);
+  initMemMask(MASK_OFFSET_ADDR, 0x0);
   #ifdef DEBUG_MSER
     printf(" done");
     printf("\n\r\t Creating MSER regions stack...");
@@ -258,50 +381,129 @@ void mser_init(void){
   for (size_t i = 0; i < MSER_MAX_REG; i++)
     gRegions[i] = malloc(sizeof(regions_t));
 
-  reset_mser();
+  // resetMser();
 
   #ifdef DEBUG_MSER
     printf(" done");
   #endif
 
-  test_memory();
+  testMem();
 
   #ifdef DEBUG_MSER
-      printf("\n\r\t End of MSER init!");
+    printf("\n\r\t Writing 0x00 again for the binary mask at the address: %x",MASK_OFFSET_ADDR);
+    initMemMask(MASK_OFFSET_ADDR, 0x0);
+  #endif
+  #ifdef DEBUG_MSER
+    printf("\n\r\t End of MSER init!");
   #endif
 }
 
-void mser_find(void){
-  bool done = false;
-  uint8_t currentLevel;
+void drawTestImage(void){
+  for (uint16_t l = 0; l < IMG_RESOLUTION_HEIGHT; l++) {
+    for (uint16_t c = 0; c < IMG_RESOLUTION_WIDTH; c++) {
+      if (c > IMG_RESOLUTION_WIDTH*0.40 && \
+          c < IMG_RESOLUTION_WIDTH*0.80 && \
+          l > IMG_RESOLUTION_HEIGHT*0.40 && \
+          l < IMG_RESOLUTION_HEIGHT*0.80){
+        setPixelLevel(l,c,15);
+      }
+      else{
+        setPixelLevel(l,c,255);
+      }
+    }
+  }
+}
 
-  gCurrentPixel = 0;
+void mserFindRegions(void){
+  bool done;
+  uint32_t currentPixel,
+           dataToStore,
+           dataToRetrieve;
+  uint16_t priority;
+  uint8_t currentLevel,
+          currentEdge,
+          neighborPixel,
+          neighborLevel,
+          newPixelGreyLevel;
+
+  resetMser();
+
+  priority = 256;
+  currentPixel = 0;
+  currentEdge = 0;
+  currentLevel = getPixelLevel(currentPixel);
+  setMaskBinPixel(currentPixel);
   gIndexRegions = 0;
-  gCounterIter = 0;
-  gCurrentEdge = 0;
+  gIndexStack = 0;
+
+  // Insert into the tree the most 'bright' pixel that equivalent to 256
+  gRegions[gIndexRegions]->level = 256; // This level do not exist
+  stackRegions[gIndexStack] = gIndexRegions;
 
   // Define the first pixel
-  currentLevel = getPixelLevel(gCurrentPixel);
-  setMaskBinPixel(gCurrentPixel);
-  gRegions[gIndexRegions++]->level = getPixelLevel(gCurrentPixel);
+  gIndexRegions++;
+  gIndexStack++;
+  gRegions[gIndexRegions]->level = currentLevel;
+  stackRegions[gIndexStack] = gIndexRegions;
 
-  uint8_t teste2 = getPixelLevel(641);
-  uint8_t teste3 = getPixelLevel(642);
-  uint8_t teste4 = getPixelLevel(643);
-  uint8_t teste5 = getPixelLevel(644);
-  // 0    1     2    3 4 5 .. 639
-  // 640 641
-  //uint8_t teste = getPixelneighborLevel(641, 0);
-  //for (size_t i = 0; i < 4; i++) {
-  //  printf("\n\rEDGE=%d PIXEL_VALUE=%d",i,getPixelneighborLevel(641, i));
-  //}
+  gCounterIter = 0;
+  done = false;
   while (!done) {
     gCounterIter++;
     //+- 2000 instrucoes / ms
+    while (currentEdge < 4) {
+      neighborPixel = getPixelneighbor(currentPixel, currentEdge);
+      if (getMaskBinPixel(neighborPixel) == false) {
+        neighborLevel = getPixelLevel(neighborPixel);
+        setMaskBinPixel(neighborPixel);
+        if (neighborLevel < currentLevel) {
+          dataToStore = (currentPixel << 4) | (currentEdge+1);
+          push(gBoundary[currentLevel],dataToStore);
+          if (currentLevel < priority) {
+            priority = currentLevel;
+          }
+          currentPixel = neighborPixel;
+          currentEdge = 0;
+          currentLevel = neighborLevel;
 
-    // while (gCurrentEdge < 4) {
-    //   edge_current++;
-    // }
-    done = gCounterIter > IMG_TOTAL_PIXELS ? 1 : 0;
+          gIndexRegions++;
+          gIndexStack++;
+          gRegions[gIndexRegions]->level = currentLevel;
+          stackRegions[gIndexStack] = gIndexRegions;
+          continue;
+        }
+
+        dataToStore = (neighborPixel << 4) | 0;
+        push(gBoundary[neighborLevel],dataToStore);
+        if (neighborLevel < priority){
+          priority = neighborLevel;
+        }
+      }
+      currentEdge = currentEdge + 1;
+    }
+    uint16_t x = currentPixel%IMG_RESOLUTION_WIDTH;
+    uint16_t y = currentPixel/IMG_RESOLUTION_WIDTH;
+    accumulateRegion(x,y);
+    if (priority == 256) {
+      for (uint8_t i = 0; i < 256; i++){
+        printf("\n\rLEVEL ->%d",i);
+        printStack(gBoundary[i]);
+      }
+      newPixelGreyLevel = (uint8_t)256;
+      processStack(newPixelGreyLevel);
+      done = 1;
+      break;
+    }
+    dataToRetrieve = pop(gBoundary[priority]);
+    currentPixel = (dataToRetrieve >> 4) & 0xffffffff;
+    currentEdge = (dataToRetrieve) & 0x0f;
+    while (isEmpty(gBoundary[priority]) && (priority < 256)) {
+      priority += 1;
+    }
+    newPixelGreyLevel =  getPixelLevel(currentPixel);
+    if (newPixelGreyLevel != currentLevel) {
+      processStack(newPixelGreyLevel);
+      currentLevel = newPixelGreyLevel;
+    }
   }
 }

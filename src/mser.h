@@ -7,6 +7,7 @@
 #define IMG_TOTAL_PIXELS      (IMG_RESOLUTION_WIDTH*IMG_RESOLUTION_HEIGHT)
 #define IMG_OFFSET_ADDR       0xC00000
 #define MASK_OFFSET_ADDR      0xE00000
+#define TEST_OFFSET_ADDR      0xB00000
 
 // MSER Parameters
 #define MSER_MIN_AREA         0.00001*IMG_TOTAL_PIXELS
@@ -14,7 +15,7 @@
 #define MSER_DELTA            2
 #define MSER_VARIATION        0.5
 #define MSER_DIVERSITY        0.33
-#define MSER_MAX_REG          150 // Max. regions to store
+#define MSER_MAX_REG          1000 // Max. regions to store
 #define MSER_INIT_VARIA       999999 // Initial variation for MSER
 
 // Boundary pixels
@@ -32,7 +33,7 @@ typedef struct rect {
 
 // Main Structure of regions
 typedef struct regions {
-  uint8_t level;
+  uint16_t level; // We need to use 256, that's why int16 not int8
   uint32_t area;
   uint64_t mom[5];
   float variation;
@@ -57,14 +58,23 @@ extern regions_t* gRegions[MSER_MAX_REG];
 extern uint32_t gCounterIter;
 
 // Prototypes
-extern void mser_init(void);
 extern struct bp_stack* CreateStack(uint16_t size);
 extern bool isFull(struct bp_stack *stack);
 extern bool isEmpty(struct bp_stack *stack);
 extern void push(struct bp_stack* stack, uint32_t item);
 extern uint32_t pop(struct bp_stack* stack);
-extern void reset_mser(void);
-extern void mser_find(void);
+extern uint32_t pop(struct bp_stack* stack);
+extern void resetMser(void);
+extern void mserFindRegions(void);
+extern void mserInit(void);
 extern uint8_t getPixelLevel(uint32_t pixel);
-
+extern void drawTestImage(void);
+extern uint8_t getPixelneighborLevel(uint32_t pixel, uint8_t edge);
+extern void setMaskBinPixel(uint32_t pixel);
+extern bool getMaskBinPixel(uint32_t pixel);
+extern void testMem(void);
+extern void initMemMask(int offset_addr, int content);
+extern void initMemImage(int offset_addr, int content);
+extern void drawTestImage(void);
+extern void setPixelLevel(uint16_t x, uint16_t y, uint8_t value);
 #endif /* _MSER_H_ */
