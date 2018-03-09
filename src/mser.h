@@ -15,11 +15,11 @@
 #define MSER_DELTA            2
 #define MSER_VARIATION        0.5
 #define MSER_DIVERSITY        0.33
-#define MSER_MAX_REG          1000 // Max. regions to store
+#define MSER_MAX_REG          200000 // Max. regions to store
 #define MSER_INIT_VARIA       999999 // Initial variation for MSER
 
 // Boundary pixels
-#define BD_MAX_STACK_PLEVEL   1000 // Max. items per gray level in the stack struct
+#define BD_MAX_STACK_PLEVEL   1000000 // Max. items per gray level in the stack struct
 #define BD_MAX_LEVELS         256 // Max levels that's capable to store in stack
 
 // Main Structure of rectangle regions
@@ -48,7 +48,7 @@ typedef struct regions {
 // neighbors grey levels 0-256;
 struct bp_stack {
   int top; // We need to assume -1, that's why used int type
-  uint16_t capacity;
+  uint32_t capacity;
   uint32_t *pixels;
 };
 
@@ -58,7 +58,7 @@ extern regions_t* gRegions[MSER_MAX_REG];
 extern uint32_t gCounterIter;
 
 // Prototypes
-extern struct bp_stack* CreateStack(uint16_t size);
+extern struct bp_stack* CreateStack(uint32_t size);
 extern bool isFull(struct bp_stack *stack);
 extern bool isEmpty(struct bp_stack *stack);
 extern void push(struct bp_stack* stack, uint32_t item);
@@ -77,4 +77,5 @@ extern void initMemMask(int offset_addr, int content);
 extern void initMemImage(int offset_addr, int content);
 extern void drawTestImage(void);
 extern void setPixelLevel(uint16_t x, uint16_t y, uint8_t value);
+
 #endif /* _MSER_H_ */

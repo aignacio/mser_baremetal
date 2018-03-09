@@ -86,7 +86,7 @@ void accumulateRegion(uint16_t x, uint16_t y){
 /******************** END REGION FUNCTIONS ********************/
 
 /******************** START STACK METHODS ********************/
-struct bp_stack* CreateStack(uint16_t size){
+struct bp_stack* CreateStack(uint32_t size){
   // Allocate space for ONE struct of type bp_stack, returning to the pointer stack
   struct bp_stack* stack = (struct bp_stack*) malloc(sizeof(struct bp_stack));
   stack->capacity = size;
@@ -347,6 +347,12 @@ void resetMser(void){
     *(ptr_memory) = 0x00000000;
     ptr_memory++;
   }
+
+  ptr_memory = IMG_OFFSET_ADDR;
+  for (i = 0; i < IMG_TOTAL_PIXELS/4; i++) {
+    *(ptr_memory) = 0xffffffff; // ANDE
+    ptr_memory++;
+  }
 }
 
 void mserInit(void){
@@ -387,7 +393,7 @@ void mserInit(void){
     printf(" done");
   #endif
 
-  testMem();
+  //testMem();
 
   #ifdef DEBUG_MSER
     printf("\n\r\t Writing 0x00 again for the binary mask at the address: %x",MASK_OFFSET_ADDR);
@@ -418,11 +424,11 @@ void mserFindRegions(void){
   bool done;
   uint32_t currentPixel,
            dataToStore,
-           dataToRetrieve;
+           dataToRetrieve,
+           neighborPixel;
   uint16_t priority;
   uint8_t currentLevel,
           currentEdge,
-          neighborPixel,
           neighborLevel,
           newPixelGreyLevel;
 
@@ -485,10 +491,6 @@ void mserFindRegions(void){
     uint16_t y = currentPixel/IMG_RESOLUTION_WIDTH;
     accumulateRegion(x,y);
     if (priority == 256) {
-      for (uint8_t i = 0; i < 256; i++){
-        printf("\n\rLEVEL ->%d",i);
-        printStack(gBoundary[i]);
-      }
       newPixelGreyLevel = (uint8_t)256;
       processStack(newPixelGreyLevel);
       done = 1;
